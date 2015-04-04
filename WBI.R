@@ -8,7 +8,7 @@ remove(list = ls())
 
 # --- Load libraries & set working directory
 libs <- c ("ggplot2", "dplyr", "RColorBrewer", "grid", "WDI", 
-           "zoo", "lubridate", "directlabels")
+           "directlabels", "gridExtra")
 
 # --- Load required libraries
 lapply(libs, require, character.only=T)
@@ -39,9 +39,7 @@ fd <- filter(d, iso3c == "EAP" | iso3c == "ECA" | iso3c == "LAC" |
 # --- Create a unique id for each region
 fd$id <- c(as.factor(fd$country))
 
-
-# Define Global Development Lab Colors for potential use
-# Lab RGB colors
+# --- Lab RGB colors
 redL   	<- c("#B71234")
 dredL 	<- c("#822443")
 dgrayL 	<- c("#565A5C")
@@ -49,89 +47,52 @@ lblueL 	<- c("#7090B7")
 dblueL 	<- c("#003359")
 lgrayL	<- c("#CECFCB")
 
-# --- Make first basic spaghetti plot of data
-p <- ggplot(fd, aes(y = SP.URB.TOTL.IN.ZS, x = year, colour = country)) + 
-        geom_path(alpha = 0.1) + geom_point(size = 3.5)
 
-# geom_point(aes(size = (SP.URB.TOTL.IN.ZS/10)))
+# --- Make first basic spaghetti plot of data
+pf <- ggplot(fd, aes(y = SP.URB.TOTL.IN.ZS, x = year, colour = country)) + #define basic plot
+        geom_path(size = 0.25) + geom_point(size = 2.5) + #customize plot type
+        geom_hline(yintercept = 50, linetype="dotted", size = 1, alpha = .10) #add in horizontal lize
 
 # --- Set legend status
-legstat <- c("top")
+legstat <- c("none")
+
+
+plot.title = "East Asia has experienced a rapid increase in the percent of the population living in urban areas in the last 30 years"
+plot.subtitle
+ggtitle(bquote(atop(.(plot.title), atop(italic(.(plot.subtitle)), "")))) 
 
 # --- Customize plot 
-pp <- p + theme(legend.position = legstat, legend.title=element_blank(), 
+pp <- pf + theme(legend.position = legstat, legend.title=element_blank(), 
           panel.border = element_blank(), legend.key = element_blank(), 
           legend.text = element_text(size = 14), #Customize legend
-          plot.title = element_text(hjust = 0, size = 16, face = "bold"), # Adjust plot title
+          plot.title = element_text(hjust = 0, size = 17, face = "bold"), # Adjust plot title
           panel.background = element_rect(fill = "white"), # Make background white 
           panel.grid.major = element_blank(), panel.grid.minor = element_blank(), #remove grid    
-          axis.ticks.y = element_blank(), #Remove axis
           axis.text.y = element_text(hjust = -0.5, size = 14, colour = dgrayL), #soften axis text
           axis.text.x = element_text(hjust = .5, size = 14, colour = dgrayL),
+          axis.ticks.y = element_blank(), # remove y-axis ticks
           #axis.ticks.x=element_blank(), # remove x-axis ticks
           #plot.margin = unit(c(1,1,1,1), "cm"),
-          plot.title = element_text(lineheight = 0 )) + # Move plot title up
-          scale_x_continuous(breaks = seq(1960, 2010, 10), expand = c(0.02,0.02)) + #customize x-axis
-          scale_y_continuous(breaks = seq(10, 80, 10)) + # customize y-axis
-          labs(x = "", y = "Urban population (% of total)\n", 
-          title = " East Asia has experienced a rapid increase in the percent of the population living in urban areas in the last 30 years.", size = 13) +
-          scale_colour_brewer(palette="Set2") + facet_wrap(~ country)
+          plot.title = element_text(lineheight = 1 ), # 
+          panel.grid.major = element_blank(), # remove facet formatting
+          panel.grid.minor = element_blank(),
+          strip.background = element_blank(),
+          strip.text.x = element_text(size = 13, colour = dgrayL, face = "bold"), # format facet panel text
+          panel.border = element_rect(colour = "black"),
+          panel.margin = unit(2, "lines")) + # Move plot title up
+          scale_x_continuous(breaks = seq(1960, 2010, 10), expand = c(0.05,0.05)) + #customize x-axis
+          scale_y_continuous(breaks = seq(0, 100, 10), limits = c(0, 100)) + # customize y-axis
+          labs(x = "", y = "Urban population (% of total)\n", # label y-axis and create title
+          title = "East Asia has experienced a rapid increase in the percent of the population living in urban areas in the last 30 years.", size = 13) +
+          facet_wrap(~ country, nrow = 1) + scale_colour_brewer(palette="Set2") # apply faceting and color palette
 print(pp)
 
-# --- Make first basic spaghetti plot of data
-pf <- ggplot(fd, aes(y = SP.URB.TOTL.IN.ZS, x = year, colour = country)) + 
-  geom_path(alpha = 0.1) + geom_point(size = 3.5) + facet_wrap( ~country)
+# Add a footnote to the graph using the gridExtra library
+g <- arrangeGrob(pp, sub = textGrob("Source: World Bank World Development Indicators"
+                , x = 0, hjust = -0.25, vjust=-0.25, 
+                gp = gpar(fontface = "italic", fontsize = 12, col = dgrayL)))
 
 
-
-
-
-
-
-
-
-# --- Interactive plots
-library(metricsgraphics)
-
-fdts <- fd 
-
-# mutate(year = as.Date(sprintf("%d-01-01", year)))
-# as.Date(fdts$year)
-
-# Rename key variable of interest
-names(fdts)[names(fdts) == 'SP.URB.TOTL.IN.ZS'] <- "Urban.Population"
-
-mjs_plot(fdts, x = year, y = Urban.Population) %>%
-    mjs_point(color_accessor = id, color_type = "number",
-              size_accessor = Urban.Population) %>%
-    mjs_labs(x = "year", y = "Urban population (% of total)") %>%
-    mjs_axis_x(xax_format = "plain") %>%
-    mjs_add_legend(legend=c("Country")) %>%
-    mjs_line()
-    
-
-# --- Check out streamgraphs of the data
-library(streamgraph)
-
-fd %>%
-  filter(grepl("^(EAP|ECA|LAC|MNA|SSA|SSA)$", iso3c)) %>%
-  group_by(year, iso3c) %>%
-  streamgraph("country", value = "Urban.Population", "year", 
-              offset = "wiggle", interpolate="linear") %>%
-  sg_axis_x(20) %>%
-  sg_fill_brewer("Set2") %>%
-  sg_legend(show=TRUE, label="Region: ")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+setwd("C:/Users/t/Documents/GitHub/EbolaR")
+# Save the plot
+ggsave(g, filename = paste("Urbanization", ".svg"), width=21, height=8)
