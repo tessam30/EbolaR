@@ -1,7 +1,7 @@
 # ---- Download WDI package and install
 
 # --- Install World Development Indicators API if not already installed
-install.packages("WDI")
+# install.packages("WDI")
 
 # --- Clear the workspace
 remove(list = ls())
@@ -17,7 +17,7 @@ lapply(libs, require, character.only=T)
 WDIsearch('urban population')
 
 # --- Extract urban population variable into new data frame
-# Select extra = TRUE to extract extra variables and use tbl_df for dplyr
+# --- Select extra = TRUE to extract extra variables and use tbl_df for dplyr
 d <- tbl_df(WDI(country = "all", indicator = "SP.URB.TOTL.IN.ZS",
          start = 1960, end = 2010, extra = TRUE, cache = NULL))
 
@@ -39,7 +39,7 @@ fd <- filter(d, iso3c == "EAP" | iso3c == "ECA" | iso3c == "LAC" |
 # --- Create a unique id for each region
 fd$id <- c(as.factor(fd$country))
 
-# --- Lab RGB colors
+# --- Lab RGB colors in case of customization
 redL   	<- c("#B71234")
 dredL 	<- c("#822443")
 dgrayL 	<- c("#565A5C")
@@ -48,18 +48,13 @@ dblueL 	<- c("#003359")
 lgrayL	<- c("#CECFCB")
 
 
-# --- Make first basic spaghetti plot of data
+# --- First basic plot of data using paths and points
 pf <- ggplot(fd, aes(y = SP.URB.TOTL.IN.ZS, x = year, colour = country)) + #define basic plot
         geom_path(size = 0.25) + geom_point(size = 2.5) + #customize plot type
         geom_hline(yintercept = 50, linetype="dotted", size = 1, alpha = .10) #add in horizontal lize
 
 # --- Set legend status
 legstat <- c("none")
-
-
-plot.title = "East Asia has experienced a rapid increase in the percent of the population living in urban areas in the last 30 years"
-plot.subtitle
-ggtitle(bquote(atop(.(plot.title), atop(italic(.(plot.subtitle)), "")))) 
 
 # --- Customize plot 
 pp <- pf + theme(legend.position = legstat, legend.title=element_blank(), 
@@ -87,12 +82,74 @@ pp <- pf + theme(legend.position = legstat, legend.title=element_blank(),
           facet_wrap(~ country, nrow = 1) + scale_colour_brewer(palette="Set2") # apply faceting and color palette
 print(pp)
 
-# Add a footnote to the graph using the gridExtra library
+# Add a footnote to the graph using the gridExtra package
 g <- arrangeGrob(pp, sub = textGrob("Source: World Bank World Development Indicators"
                 , x = 0, hjust = -0.25, vjust=-0.25, 
                 gp = gpar(fontface = "italic", fontsize = 12, col = dgrayL)))
 
 
-setwd("C:/Users/t/Documents/GitHub/EbolaR")
+# --- Create variable reflecting working directory
+wd <- c("C:/Users/t/Documents/GitHub/EbolaR")
+setwd(wd)
+
 # Save the plot
-ggsave(g, filename = paste("Urbanization", ".svg"), width=21, height=8)
+ggsave(g, filename = paste("Urbanization.png"), width=21, height=10, dpi = 300)
+
+
+
+############
+# Dygraphs #
+############
+
+# --- Load new libraries for interactive graphics
+library("reshape2")
+library("zoo")
+library("htmlwidgets")
+library("dygraphs")
+
+# --- Select and reshape data and try interactive plot
+names(fd)
+fds <- select(fd, country, SP.URB.TOTL.IN.ZS, year, id)
+
+# --- Select and reshape the data to make interactive plots using the dygraphs package
+fds_reshape <- dcast(fds, year ~ country, value.var = "SP.URB.TOTL.IN.ZS" )
+
+# --- Add time variable to dataset
+fds_wide <- as.data.frame(fds_reshape %>%
+  mutate(year = as.Date(sprintf("%d-01-01", year))))
+
+# --- Declare time variable
+date <- as.Date(fds_wide$year)
+
+# --- Create subset of data containing only country values
+urb <- subset(fds_wide, select = -c(year) )
+
+# Rename variables for Legend
+colnames(urb) <- c("E. Asia", "Europe & C. Asia", "LAC", "MENA", "S. Asia", "Sub-Saharan Africa")
+
+# Set data as time-series and make basic plots
+urb.ts <- zoo(urb, order.by=date)
+plot(urb.ts)
+dygraph(urb.ts)
+
+# Customize the dygraph 
+dg <- dygraph(urb.ts, main = "East Asia has experienced rapid urbanization in the past 30 years") %>%
+  dyAxis("y", label = "Urban population (% of total)", drawGrid = FALSE) %>%
+  dyAxis("x", pixelsPerLabel = 50, drawGrid = FALSE) %>%
+  dyOptions(axisLineWidth = 0.01, colors = RColorBrewer::brewer.pal(6, "Set2"))  %>%
+  dyLegend(width = 800) %>%
+  dyRangeSelector() %>%
+  dyHighlight(highlightCircleSize = 3.5, 
+              highlightSeriesBackgroundAlpha = 0.2,
+              hideOnMouseOut = TRUE)
+
+setwd(wd)
+saveWidget(dg, "Urbanization.html", selfcontained = TRUE)
+
+# --- Investigate use of steamgraphs (Not really appropriate for this type of data)
+library("streamgraph")
+fd %>%
+  streamgraph("country", "SP.URB.TOTL.IN.ZS", "year", offset = "zero", interpolate="linear")
+    sg_legend(show = TRUE, label = "Country:")
+
+
